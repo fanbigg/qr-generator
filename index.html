@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>QR Code Generator</title>
+  <meta name="description" content="A simple, secure, and offline-first QR Code Generator.">
+
+  <!-- Subresource Integrity validated browser build of qrcode.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode/1.4.4/qrcode.min.js" integrity="sha384-0RsG1yo/crf/1Qc14sho26SXXOTngNCjgJw7fuvXBt9W/OChF/Ijx+aUuBDqQwEk" crossorigin="anonymous"></script>
+
+  <style>
+    /* macOS System Styling Variables */
+    :root {
+      --font-stack: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      
+      /* Light Mode Palette */
+      --window-bg: #ececec;
+      --content-bg: #ffffff;
+      --input-bg: #ffffff;
+      --input-border: #c3c3c3;
+      --text-main: #333333;
+      --text-muted: #888888;
+      --accent-blue: #007af5;
+      --accent-hover: #0062c4;
+      --border-color: #dcdcdc;
+      --shadow-color: rgba(0, 0, 0, 0.15);
+      --placeholder-color: #bbbbbb;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        /* Dark Mode Palette */
+        --window-bg: #2d2d2d;
+        --content-bg: #1e1e1e;
+        --input-bg: #2d2d2d;
+        --input-border: #4a4a4a;
+        --text-main: #dfdfdf;
+        --text-muted: #8e8e8e;
+        --accent-blue: #0a84ff;
+        --accent-hover: #0066d6;
+        --border-color: #383838;
+        --shadow-color: rgba(0, 0, 0, 0.4);
+        --placeholder-color: #555555;
+      }
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--content-bg);
+      color: var(--text-main);
+      font-family: var(--font-stack);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+    }
+
+    /* macOS Window Simulator */
+    .macos-window {
+      background-color: var(--window-bg);
+      border-radius: 12px;
+      width: 100%;
+      max-width: 440px;
+      box-shadow: 0 20px 40px var(--shadow-color), 0 0 0 1px rgba(0,0,0,0.05);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* macOS Title Bar */
+    .title-bar {
+      height: 38px;
+      display: flex;
+      align-items: center;
+      padding: 0 16px;
+      position: relative;
+      border-bottom: 1px solid var(--border-color);
+      user-select: none;
+    }
+
+    .traffic-lights {
+      display: flex;
+      gap: 8px;
+    }
+
+    .dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+
+    .dot-close { background-color: #ff5f56; border: 0.5px solid #e0443e; }
+    .dot-minimize { background-color: #ffbd2e; border: 0.5px solid #dfa123; }
+    .dot-zoom { background-color: #27c93f; border: 0.5px solid #1aab29; }
+
+    .window-title {
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-main);
+    }
+
+    /* Window Content Pane */
+    .content-pane {
+      background-color: var(--content-bg);
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    /* Forms input */
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    label {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-muted);
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 80px;
+      background-color: var(--input-bg);
+      border: 1px solid var(--input-border);
+      border-radius: 6px;
+      padding: 8px 10px;
+      color: var(--text-main);
+      font-family: inherit;
+      font-size: 13px;
+      resize: vertical;
+      transition: box-shadow 0.15s ease;
+      outline: none;
+    }
+
+    textarea:focus {
+      border-color: var(--accent-blue);
+      box-shadow: 0 0 0 3px rgba(10, 132, 255, 0.35);
+    }
+
+    textarea::placeholder {
+      color: var(--placeholder-color);
+    }
+
+    /* macOS Push Button */
+    .btn {
+      width: 100%;
+      height: 32px;
+      background-color: var(--accent-blue);
+      color: #ffffff;
+      border: none;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background-color 0.15s ease;
+    }
+
+    .btn:hover:not(:disabled) {
+      background-color: var(--accent-hover);
+    }
+
+    .btn:active:not(:disabled) {
+      opacity: 0.85;
+    }
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    /* Output Window Area */
+    .output-section {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      padding-top: 8px;
+      border-top: 1px solid var(--border-color);
+    }
+
+    .output-window {
+      width: 200px;
+      height: 200px;
+      background-color: var(--window-bg);
+      border: 1px solid var(--input-border);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      position: relative;
+      transition: background-color 0.2s ease;
+    }
+
+    .output-window.has-qr {
+      background-color: #ffffff !important;
+    }
+
+    #qr-img {
+      width: 100% !important;
+      height: 100% !important;
+      object-fit: contain;
+      background-color: #ffffff;
+      display: none;
+    }
+
+    .placeholder-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      color: var(--text-muted);
+      font-size: 12px;
+      text-align: center;
+      padding: 16px;
+    }
+
+    .placeholder-state svg {
+      width: 32px;
+      height: 32px;
+      fill: currentColor;
+      opacity: 0.4;
+    }
+
+    /* Save Link Action */
+    .save-link {
+      font-size: 12px;
+      color: var(--accent-blue);
+      text-decoration: none;
+      font-weight: 500;
+      cursor: pointer;
+    }
+
+    .save-link:hover {
+      text-decoration: underline;
+    }
+
+    .save-link.disabled {
+      color: var(--text-muted);
+      pointer-events: none;
+      text-decoration: none;
+      opacity: 0.5;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Simulated macOS App Window -->
+  <div class="macos-window">
+    
+    <!-- Title Bar Header -->
+    <div class="title-bar">
+      <div class="traffic-lights">
+        <span class="dot dot-close"></span>
+        <span class="dot dot-minimize"></span>
+        <span class="dot dot-zoom"></span>
+      </div>
+      <span class="window-title">QR Generator</span>
+    </div>
+
+    <!-- App Content Pane -->
+    <div class="content-pane">
+      
+      <!-- Input Field Area -->
+      <div class="form-group">
+        <label for="qr-input">LINK OR TEXT</label>
+        <textarea 
+          id="qr-input" 
+          placeholder="https://example.com" 
+          maxlength="1000" 
+          autocomplete="off" 
+          spellcheck="false"
+          enterkeyhint="done"
+        ></textarea>
+      </div>
+
+      <!-- Action Submission Button -->
+      <button type="button" class="btn" id="btn-generate" disabled>Generate</button>
+
+      <!-- Output Display & Download Area -->
+      <div class="output-section">
+        <label>OUTPUT IMAGE</label>
+        
+        <div class="output-window">
+          <!-- Output preview image -->
+          <img id="qr-img" alt="QR Code Preview">
+
+          <!-- Native macOS Icon Placeholder -->
+          <div class="placeholder-state" id="placeholder">
+            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path d="M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zm0 2v14h14V5H5zm4.5 3a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3zm-2.5 8h10l-3-4-2 2.5-1.5-1.5-3.5 3z"/>
+            </svg>
+            <span>Preview Area</span>
+          </div>
+        </div>
+
+        <!-- Download Action Trigger -->
+        <a class="save-link disabled" id="btn-download">Save Image...</a>
+      </div>
+
+    </div>
+
+  </div>
+
+  <script>
+    const qrInput = document.getElementById('qr-input');
+    const btnGenerate = document.getElementById('btn-generate');
+    const btnDownload = document.getElementById('btn-download');
+    const qrImg = document.getElementById('qr-img');
+    const placeholder = document.getElementById('placeholder');
+
+    // Enable/disable Generate button depending on input
+    qrInput.addEventListener('input', () => {
+      const value = qrInput.value.trim();
+      btnGenerate.disabled = value.length === 0;
+      
+      // If input is cleared, reset the preview pane
+      if (value.length === 0) {
+        qrImg.style.display = 'none';
+        qrImg.removeAttribute('src');
+        qrImg.parentElement.classList.remove('has-qr');
+        placeholder.style.display = 'flex';
+        btnDownload.classList.add('disabled');
+        btnDownload.removeAttribute('href');
+        btnDownload.removeAttribute('download');
+      }
+    });
+
+    // Render the QR code when Submit is clicked
+    btnGenerate.addEventListener('click', () => {
+      const text = qrInput.value.trim();
+      if (!text) return;
+
+      const options = {
+        errorCorrectionLevel: 'M',
+        width: 400,
+        margin: 4, // 4 modules margin for the standard recommended quiet zone
+        color: {
+          dark: '#000000',
+          light: '#ffffff'
+        }
+      };
+
+      // Generate as data URL for <img> element
+      QRCode.toDataURL(text, options, function (error, url) {
+        if (error) {
+          console.error(error);
+          alert('Error generating QR code. Content might be too large.');
+          return;
+        }
+
+        // Display the image and set active download path
+        placeholder.style.display = 'none';
+        qrImg.src = url;
+        qrImg.style.display = 'block';
+        qrImg.parentElement.classList.add('has-qr');
+        
+        btnDownload.href = url;
+        btnDownload.download = 'qr-code.png';
+        btnDownload.classList.remove('disabled');
+      });
+    });
+  </script>
+</body>
+</html>
