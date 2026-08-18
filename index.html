@@ -2,18 +2,27 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>QR Code Generator</title>
   <meta name="description" content="A simple, secure, and offline-first QR Code Generator.">
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#1e1e1e" media="(prefers-color-scheme: dark)">
 
-  <!-- Subresource Integrity validated browser build of qrcode.js -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode/1.4.4/qrcode.min.js" integrity="sha384-0RsG1yo/crf/1Qc14sho26SXXOTngNCjgJw7fuvXBt9W/OChF/Ijx+aUuBDqQwEk" crossorigin="anonymous"></script>
+  <!-- Bundled locally so the app really is offline-first: no CDN, no network. -->
+  <script src="vendor-qrcode.min.js"></script>
 
   <style>
-    /* macOS System Styling Variables */
+    /* ============================================================
+       Shared macOS app shell.
+
+       This block is identical across the Micro Apps set (QR Generator,
+       Event Formatter, Wheel of Fortune). Change it in one app and copy
+       it to the others rather than editing a single app in isolation.
+       ============================================================ */
     :root {
       --font-stack: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+
       /* Light Mode Palette */
       --window-bg: #ececec;
       --content-bg: #ffffff;
@@ -23,6 +32,11 @@
       --text-muted: #888888;
       --accent-blue: #007af5;
       --accent-hover: #0062c4;
+      --accent-text: #ffffff;
+      --control-bg: #ffffff;
+      --control-hover: #f2f2f2;
+      --success: #1a9d3a;
+      --danger: #d70015;
       --border-color: #dcdcdc;
       --shadow-color: rgba(0, 0, 0, 0.15);
       --placeholder-color: #bbbbbb;
@@ -39,6 +53,11 @@
         --text-muted: #8e8e8e;
         --accent-blue: #0a84ff;
         --accent-hover: #0066d6;
+        --accent-text: #ffffff;
+        --control-bg: #3a3a3a;
+        --control-hover: #454545;
+        --success: #30d158;
+        --danger: #ff453a;
         --border-color: #383838;
         --shadow-color: rgba(0, 0, 0, 0.4);
         --placeholder-color: #555555;
@@ -51,15 +70,20 @@
       padding: 0;
     }
 
+    html { -webkit-text-size-adjust: 100%; }
+
     body {
       background-color: var(--content-bg);
       color: var(--text-main);
       font-family: var(--font-stack);
-      min-height: 100vh;
+      min-height: 100dvh;
       display: flex;
       align-items: center;
       justify-content: center;
       padding: 1.5rem;
+      padding-top: max(1.5rem, env(safe-area-inset-top, 0px));
+      padding-bottom: max(1.5rem, env(safe-area-inset-bottom, 0px));
+      -webkit-font-smoothing: antialiased;
     }
 
     /* macOS Window Simulator */
@@ -67,7 +91,6 @@
       background-color: var(--window-bg);
       border-radius: 12px;
       width: 100%;
-      max-width: 440px;
       box-shadow: 0 20px 40px var(--shadow-color), 0 0 0 1px rgba(0,0,0,0.05);
       overflow: hidden;
       display: flex;
@@ -83,6 +106,7 @@
       position: relative;
       border-bottom: 1px solid var(--border-color);
       user-select: none;
+      flex: none;
     }
 
     .traffic-lights {
@@ -108,6 +132,7 @@
       font-size: 13px;
       font-weight: 600;
       color: var(--text-main);
+      white-space: nowrap;
     }
 
     /* Window Content Pane */
@@ -117,24 +142,25 @@
       display: flex;
       flex-direction: column;
       gap: 16px;
+      min-height: 0;
     }
 
-    /* Forms input */
     .form-group {
       display: flex;
       flex-direction: column;
       gap: 6px;
+      min-height: 0;
     }
 
     label {
       font-size: 12px;
       font-weight: 500;
       color: var(--text-muted);
+      letter-spacing: 0.3px;
     }
 
     textarea {
       width: 100%;
-      min-height: 80px;
       background-color: var(--input-bg);
       border: 1px solid var(--input-border);
       border-radius: 6px;
@@ -142,9 +168,11 @@
       color: var(--text-main);
       font-family: inherit;
       font-size: 13px;
-      resize: vertical;
-      transition: box-shadow 0.15s ease;
+      line-height: 1.45;
+      transition: box-shadow 0.15s ease, border-color 0.15s ease;
       outline: none;
+      -webkit-appearance: none;
+      appearance: none;
     }
 
     textarea:focus {
@@ -152,39 +180,138 @@
       box-shadow: 0 0 0 3px rgba(10, 132, 255, 0.35);
     }
 
-    textarea::placeholder {
-      color: var(--placeholder-color);
+    textarea::placeholder { color: var(--placeholder-color); }
+
+    textarea:disabled { opacity: 0.55; }
+
+    .hint {
+      font-size: 11px;
+      color: var(--text-muted);
     }
 
     /* macOS Push Button */
     .btn {
-      width: 100%;
       height: 32px;
+      padding: 0 14px;
       background-color: var(--accent-blue);
-      color: #ffffff;
+      color: var(--accent-text);
       border: none;
       border-radius: 6px;
+      font-family: inherit;
       font-size: 13px;
       font-weight: 500;
       cursor: pointer;
-      display: flex;
+      display: inline-flex;
       align-items: center;
       justify-content: center;
+      gap: 6px;
+      white-space: nowrap;
       transition: background-color 0.15s ease;
+      touch-action: manipulation;
+      flex: none;
     }
 
-    .btn:hover:not(:disabled) {
-      background-color: var(--accent-hover);
-    }
+    .btn-block { width: 100%; }
 
-    .btn:active:not(:disabled) {
-      opacity: 0.85;
+    .btn:hover:not(:disabled) { background-color: var(--accent-hover); }
+    .btn:active:not(:disabled) { opacity: 0.85; }
+
+    .btn:focus-visible {
+      outline: 2px solid var(--accent-hover);
+      outline-offset: 2px;
     }
 
     .btn:disabled {
       opacity: 0.5;
       cursor: not-allowed;
     }
+
+    /* Secondary / bezeled button */
+    .btn-secondary {
+      background-color: var(--control-bg);
+      color: var(--text-main);
+      border: 1px solid var(--input-border);
+    }
+
+    .btn-secondary:hover:not(:disabled) { background-color: var(--control-hover); }
+
+    .btn-danger { background-color: var(--danger); color: #ffffff; }
+    .btn-danger:hover:not(:disabled) { background-color: var(--danger); opacity: 0.88; }
+
+    /* Inline status line — used instead of alert() so errors never block. */
+    .status {
+      font-size: 12px;
+      line-height: 1.4;
+      text-align: center;
+      min-height: 1.4em;
+      color: var(--text-muted);
+    }
+
+    .status.error { color: var(--danger); font-weight: 500; }
+
+    /* ---- Phone ---- */
+    @media (max-width: 520px) {
+      body {
+        padding: 0;
+        align-items: stretch;
+      }
+
+      .macos-window {
+        max-width: none;
+        min-height: 100dvh;
+        border-radius: 0;
+        box-shadow: none;
+      }
+
+      .title-bar {
+        height: calc(46px + env(safe-area-inset-top, 0px));
+        padding-top: env(safe-area-inset-top, 0px);
+      }
+
+      /* Set-dressing on desktop; only a mis-tap target on a phone. */
+      .traffic-lights { display: none; }
+
+      .window-title {
+        position: static;
+        transform: none;
+        font-size: 17px;
+      }
+
+      .content-pane {
+        flex: 1;
+        padding: 20px 16px calc(20px + env(safe-area-inset-bottom, 0px));
+        gap: 18px;
+      }
+
+      textarea {
+        /* 16px stops iOS Safari zooming the page on focus. */
+        font-size: 16px;
+        padding: 12px;
+        border-radius: 10px;
+      }
+
+      .btn {
+        height: 46px;
+        font-size: 16px;
+        border-radius: 10px;
+      }
+
+      .hint, .status { font-size: 13px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+    /* ==================== end shared shell ==================== */
+
+    /* ==================== QR Generator ==================== */
+    .macos-window { max-width: 440px; }
+
+    #qr-input { min-height: 80px; resize: vertical; }
 
     /* Output Window Area */
     .output-section {
@@ -198,7 +325,8 @@
 
     .output-window {
       width: 200px;
-      height: 200px;
+      max-width: 100%;
+      aspect-ratio: 1 / 1;
       background-color: var(--window-bg);
       border: 1px solid var(--input-border);
       border-radius: 8px;
@@ -210,17 +338,22 @@
       transition: background-color 0.2s ease;
     }
 
-    .output-window.has-qr {
-      background-color: #ffffff !important;
-    }
+    .output-window.has-qr { background-color: #ffffff; }
 
-    #qr-img {
+    #qr-canvas {
+      /* QRCode.toCanvas() stamps an inline width/height in px on the element,
+         which would otherwise overflow this box and crop away the quiet zone.
+         !important is what keeps the preview fitted. */
       width: 100% !important;
       height: 100% !important;
       object-fit: contain;
       background-color: #ffffff;
       display: none;
+      image-rendering: -webkit-optimize-contrast;
     }
+
+    .output-window.has-qr #qr-canvas { display: block; }
+    .output-window.has-qr .placeholder-state { display: none; }
 
     .placeholder-state {
       display: flex;
@@ -244,20 +377,35 @@
     .save-link {
       font-size: 12px;
       color: var(--accent-blue);
-      text-decoration: none;
+      background: none;
+      border: none;
+      font-family: inherit;
       font-weight: 500;
       cursor: pointer;
+      padding: 6px 10px;
+      border-radius: 6px;
+      touch-action: manipulation;
     }
 
-    .save-link:hover {
-      text-decoration: underline;
-    }
+    .save-link:hover:not(:disabled) { text-decoration: underline; }
+    .save-link:focus-visible { outline: 2px solid var(--accent-blue); outline-offset: 2px; }
 
-    .save-link.disabled {
+    .save-link:disabled {
       color: var(--text-muted);
-      pointer-events: none;
+      cursor: not-allowed;
       text-decoration: none;
       opacity: 0.5;
+    }
+
+    @media (max-width: 520px) {
+      #qr-input { min-height: 96px; }
+      .output-window { width: min(280px, 74vw); border-radius: 12px; }
+      .save-link {
+        font-size: 15px;
+        min-height: 44px;
+        display: inline-flex;
+        align-items: center;
+      }
     }
   </style>
 </head>
@@ -265,7 +413,7 @@
 
   <!-- Simulated macOS App Window -->
   <div class="macos-window">
-    
+
     <!-- Title Bar Header -->
     <div class="title-bar">
       <div class="traffic-lights">
@@ -278,42 +426,43 @@
 
     <!-- App Content Pane -->
     <div class="content-pane">
-      
+
       <!-- Input Field Area -->
       <div class="form-group">
         <label for="qr-input">LINK OR TEXT</label>
-        <textarea 
-          id="qr-input" 
-          placeholder="https://example.com" 
-          maxlength="1000" 
-          autocomplete="off" 
+        <textarea
+          id="qr-input"
+          placeholder="https://example.com"
+          maxlength="1000"
+          autocomplete="off"
+          autocapitalize="off"
           spellcheck="false"
           enterkeyhint="done"
         ></textarea>
+        <span class="hint">Updates as you type. Press <kbd>&#8984;</kbd>/<kbd>Ctrl</kbd> + <kbd>Enter</kbd> to regenerate.</span>
       </div>
 
       <!-- Action Submission Button -->
-      <button type="button" class="btn" id="btn-generate" disabled>Generate</button>
+      <button type="button" class="btn btn-block" id="btn-generate" disabled>Generate</button>
 
       <!-- Output Display & Download Area -->
       <div class="output-section">
-        <label>OUTPUT IMAGE</label>
-        
-        <div class="output-window">
-          <!-- Output preview image -->
-          <img id="qr-img" alt="QR Code Preview">
+        <label id="output-label">OUTPUT IMAGE</label>
 
-          <!-- Native macOS Icon Placeholder -->
+        <div class="output-window" id="output-window">
+          <canvas id="qr-canvas" role="img" aria-labelledby="output-label"></canvas>
+
           <div class="placeholder-state" id="placeholder">
-            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
               <path d="M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zm0 2v14h14V5H5zm4.5 3a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3zm-2.5 8h10l-3-4-2 2.5-1.5-1.5-3.5 3z"/>
             </svg>
             <span>Preview Area</span>
           </div>
         </div>
 
-        <!-- Download Action Trigger -->
-        <a class="save-link disabled" id="btn-download">Save Image...</a>
+        <button type="button" class="save-link" id="btn-download" disabled>Save Image&#8230;</button>
+
+        <p class="status" id="status" role="status" aria-live="polite"></p>
       </div>
 
     </div>
@@ -321,63 +470,142 @@
   </div>
 
   <script>
+    'use strict';
+
     const qrInput = document.getElementById('qr-input');
     const btnGenerate = document.getElementById('btn-generate');
     const btnDownload = document.getElementById('btn-download');
-    const qrImg = document.getElementById('qr-img');
-    const placeholder = document.getElementById('placeholder');
+    const qrCanvas = document.getElementById('qr-canvas');
+    const outputWindow = document.getElementById('output-window');
+    const statusEl = document.getElementById('status');
 
-    // Enable/disable Generate button depending on input
-    qrInput.addEventListener('input', () => {
-      const value = qrInput.value.trim();
-      btnGenerate.disabled = value.length === 0;
-      
-      // If input is cleared, reset the preview pane
-      if (value.length === 0) {
-        qrImg.style.display = 'none';
-        qrImg.removeAttribute('src');
-        qrImg.parentElement.classList.remove('has-qr');
-        placeholder.style.display = 'flex';
-        btnDownload.classList.add('disabled');
-        btnDownload.removeAttribute('href');
-        btnDownload.removeAttribute('download');
+    const QR_OPTIONS = {
+      errorCorrectionLevel: 'M',
+      width: 512,
+      margin: 4,                 // 4 modules = the standard quiet zone
+      color: { dark: '#000000', light: '#ffffff' }
+    };
+
+    let objectUrl = null;        // blob URL backing the current download
+    let currentBlob = null;
+    let debounceId = null;
+
+    function setStatus(message, isError) {
+      statusEl.textContent = message || '';
+      statusEl.classList.toggle('error', Boolean(isError));
+    }
+
+    // The library is the one hard dependency; if the file is missing there is
+    // nothing to fall back to, so say so rather than throwing on first click.
+    if (typeof QRCode === 'undefined') {
+      btnGenerate.disabled = true;
+      qrInput.disabled = true;
+      setStatus('Could not load vendor-qrcode.min.js. Make sure it sits next to index.html.', true);
+    }
+
+    function releaseOutput() {
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl);
+        objectUrl = null;
       }
-    });
+      currentBlob = null;
+      btnDownload.disabled = true;
+    }
 
-    // Render the QR code when Submit is clicked
-    btnGenerate.addEventListener('click', () => {
+    function resetPreview() {
+      releaseOutput();
+      outputWindow.classList.remove('has-qr');
+      const ctx = qrCanvas.getContext('2d');
+      ctx.clearRect(0, 0, qrCanvas.width, qrCanvas.height);
+      setStatus('');
+    }
+
+    function generate() {
+      if (typeof QRCode === 'undefined') return;
+
       const text = qrInput.value.trim();
-      if (!text) return;
+      if (!text) {
+        resetPreview();
+        return;
+      }
 
-      const options = {
-        errorCorrectionLevel: 'M',
-        width: 400,
-        margin: 4, // 4 modules margin for the standard recommended quiet zone
-        color: {
-          dark: '#000000',
-          light: '#ffffff'
-        }
-      };
-
-      // Generate as data URL for <img> element
-      QRCode.toDataURL(text, options, function (error, url) {
+      QRCode.toCanvas(qrCanvas, text, QR_OPTIONS, function (error) {
         if (error) {
           console.error(error);
-          alert('Error generating QR code. Content might be too large.');
+          resetPreview();
+          setStatus('Could not encode this text — it may be too long for one QR code.', true);
           return;
         }
 
-        // Display the image and set active download path
-        placeholder.style.display = 'none';
-        qrImg.src = url;
-        qrImg.style.display = 'block';
-        qrImg.parentElement.classList.add('has-qr');
-        
-        btnDownload.href = url;
-        btnDownload.download = 'qr-code.png';
-        btnDownload.classList.remove('disabled');
+        outputWindow.classList.add('has-qr');
+        setStatus('');
+
+        // Rebuild the downloadable blob to match what is on screen.
+        releaseOutput();
+        qrCanvas.toBlob(function (blob) {
+          if (!blob) return;
+          currentBlob = blob;
+          objectUrl = URL.createObjectURL(blob);
+          btnDownload.disabled = false;
+        }, 'image/png');
       });
+    }
+
+    function scheduleGenerate() {
+      clearTimeout(debounceId);
+      debounceId = setTimeout(generate, 200);
+    }
+
+    qrInput.addEventListener('input', () => {
+      const hasText = qrInput.value.trim().length > 0;
+      btnGenerate.disabled = !hasText || typeof QRCode === 'undefined';
+      if (!hasText) {
+        clearTimeout(debounceId);
+        resetPreview();
+        return;
+      }
+      scheduleGenerate();
     });
+
+    qrInput.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
+        event.preventDefault();
+        clearTimeout(debounceId);
+        generate();
+      }
+    });
+
+    btnGenerate.addEventListener('click', () => {
+      clearTimeout(debounceId);
+      generate();
+    });
+
+    btnDownload.addEventListener('click', async () => {
+      if (!currentBlob) return;
+
+      const file = new File([currentBlob], 'qr-code.png', { type: 'image/png' });
+
+      // iOS Safari ignores the download attribute, so hand the file to the
+      // share sheet where "Save Image" actually exists.
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        try {
+          await navigator.share({ files: [file] });
+          return;
+        } catch (err) {
+          if (err && err.name === 'AbortError') return;   // user dismissed it
+          // Anything else: fall through to the plain download below.
+        }
+      }
+
+      const link = document.createElement('a');
+      link.href = objectUrl;
+      link.download = 'qr-code.png';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    });
+
+    window.addEventListener('pagehide', releaseOutput);
   </script>
 </body>
 </html>
